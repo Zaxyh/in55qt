@@ -53,6 +53,7 @@
 
 #include "camera.h"
 #include "geometryengine.h"
+#include "md5parser.h"
 
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
@@ -101,12 +102,8 @@ private:
     QVector3D m_movementDir;
     bool m_q,m_s,m_d,m_z,m_a,m_e;
 
-    /*
-    QVector2D mousePressPosition;
-    QVector3D rotationAxis;
-    qreal angularSpeed;
-    QQuaternion rotation;
-    */
+    MD5Mesh mesh;
+    MD5Anim anim;
 };
 
 #endif // MAINWIDGET_H

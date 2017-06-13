@@ -54,6 +54,7 @@
 
 #include <math.h>
 
+#include "QDir"
 MainWidget::MainWidget(QWidget *parent) :
     QOpenGLWidget(parent),
     geometries(0),
@@ -225,6 +226,16 @@ void MainWidget::initializeGL()
 
     // Use QBasicTimer because its faster than QTimer
     timer.start(12, this);
+
+    QTextStream out(stdout);
+    QString file = QDir::currentPath()+"/Animation/bob_lamp_update.md5mesh";
+
+    mesh = MD5Parser::ParseMeshFile(file);
+    out << file << "\n";
+    out << mesh.toString(true) << "\n";
+    mesh.initDrawing();
+    out << mesh.toString(true) << "\n";
+    out <<"Inited for drawing !\n";
 }
 
 //! [3]
@@ -286,4 +297,5 @@ void MainWidget::paintGL()
 
     // Draw cube geometry
     geometries->drawGeometry(&program);
+    mesh.draw(&program);
 }
