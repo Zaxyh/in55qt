@@ -89,6 +89,7 @@ public:
 
     void initDrawing();
     void draw(QOpenGLShaderProgram *program);
+    void drawSkeleton(QOpenGLShaderProgram *program);
 
     QString toString(bool more = false);
 private:
@@ -99,6 +100,12 @@ private:
 
     QVector<MD5MeshMesh> m_meshes;
     QVector<MD5MeshJoint> m_joints;
+
+    QOpenGLBuffer m_arrayPointBuf;
+    QOpenGLBuffer m_indexPointBuf;
+
+    QOpenGLBuffer m_arrayLineBuf;
+    QOpenGLBuffer m_indexLineBuf;
 
     void computeVerticesPositions();
 };

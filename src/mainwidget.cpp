@@ -219,7 +219,7 @@ void MainWidget::initializeGL()
     glEnable(GL_DEPTH_TEST);
 
     // Enable back face culling
-    glEnable(GL_CULL_FACE);
+    //glEnable(GL_CULL_FACE);
 //! [2]
 
     geometries = new GeometryEngine;
@@ -228,13 +228,10 @@ void MainWidget::initializeGL()
     timer.start(12, this);
 
     QTextStream out(stdout);
-    QString file = QDir::currentPath()+"/Animation/bob_lamp_update.md5mesh";
 
-    mesh = MD5Parser::ParseMeshFile(file);
-    out << file << "\n";
-    out << mesh.toString(true) << "\n";
+    mesh = MD5Parser::ParseMeshFile("Animation/bob_lamp_update.md5mesh");
     mesh.initDrawing();
-    out << mesh.toString(true) << "\n";
+    out << mesh.toString() << "\n";
     out <<"Inited for drawing !\n";
 }
 
@@ -297,5 +294,10 @@ void MainWidget::paintGL()
 
     // Draw cube geometry
     geometries->drawGeometry(&program);
+
+    m_model.rotate(-90.0f,QVector3D(1.0f,0.0f,0.0f));
+    m_model.scale(0.3f);
+    program.setUniformValue("mvp", projection * view * m_model);
     mesh.draw(&program);
+    //mesh.drawSkeleton(&program);
 }
