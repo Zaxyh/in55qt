@@ -1,14 +1,15 @@
 #ifndef MD5MESH_H
 #define MD5MESH_H
 
-#include "QQuaternion"
+#include <QQuaternion>
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
-#include "QString"
-#include "QVector"
-#include "QVector2D"
-#include "QVector3D"
+#include <QOpenGLTexture>
+#include <QString>
+#include <QVector>
+#include <QVector2D>
+#include <QVector3D>
 
 class MD5Mesh : protected QOpenGLFunctions
 {
@@ -44,7 +45,7 @@ public:
 
     struct MD5MeshMesh
     {
-        QString shader;
+        QOpenGLTexture *shader = NULL;
 
         int numVerts;
         QVector<MD5MeshVertex> vertices;
@@ -82,14 +83,14 @@ public:
     void setNumWeightsInMesh(int mesh_indice, int n);
     int getNumWeightsInMesh();
 
-    void setShaderInMesh(int mesh_indice, QString name);
+    void setShaderInMesh(int mesh_indice, QOpenGLTexture *texture);
     QString getShaderInMesh();
 
     bool isCorrupted();
 
     void initDrawing();
     void draw(QOpenGLShaderProgram *program);
-    void drawSkeleton(QOpenGLShaderProgram *program);
+    void drawSkeleton(QOpenGLShaderProgram *programLines, QOpenGLShaderProgram *programPoints);
 
     QString toString(bool more = false);
 private:

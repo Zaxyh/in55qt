@@ -1,10 +1,17 @@
 #include "md5mesh.h"
 
-struct MD5VertexDrawing
+struct MD5VertexTexture
+{
+    QVector3D position;
+    QVector2D st;
+};
+
+struct MD5VertexColor
 {
     QVector3D position;
     QVector3D color;
 };
+
 
 MD5Mesh::MD5Mesh():
     m_arrayPointBuf(QOpenGLBuffer::VertexBuffer),
@@ -23,6 +30,11 @@ MD5Mesh::~MD5Mesh()
         {
             m.arrayBuf.destroy();
             m.indexBuf.destroy();
+        }
+
+        if(m.shader!=NULL)
+        {
+            m.shader->destroy();
         }
     }
 
@@ -139,9 +151,9 @@ void MD5Mesh::setNumWeightsInMesh(int mesh_indice, int n)
     m_meshes[mesh_indice].numWeights = n;
 }
 
-void MD5Mesh::setShaderInMesh(int mesh_indice, QString name)
+void MD5Mesh::setShaderInMesh(int mesh_indice, QOpenGLTexture *texture)
 {
-    m_meshes[mesh_indice].shader = name;
+    m_meshes[mesh_indice].shader = texture;
 }
 
 void MD5Mesh::computeVerticesPositions()
@@ -165,7 +177,6 @@ void MD5Mesh::computeVerticesPositions()
                 v->computedPosition += (j->position + weight_rotated_position) * w->bias;
                 total_bias+=w->bias;
             }
-            //qDebug() << "Computed["<<mesh_ind<<"|"<<vert_ind<<+"] : "<<v->computedPosition << " bias : " << total_bias;
         }
     }
 
@@ -192,17 +203,17 @@ void MD5Mesh::initDrawing()
         m->indexBuf.create();
         m->vbosInited = true;
 
-        QVector<MD5VertexDrawing> draw_vertices;
+        QVector<MD5VertexTexture> draw_vertices;
         for(int vert_ind=0;vert_ind<m->numVerts;++vert_ind)
         {
-            MD5VertexDrawing vd;
+            MD5VertexTexture vd;
             vd.position = m->vertices[vert_ind].computedPosition;
-            vd.color = QVector3D(0.65f,0.65f,0.65f);
+            vd.st = m->vertices[vert_ind].st;
             draw_vertices.append(vd);
         }
 
         m->arrayBuf.bind();
-        m->arrayBuf.allocate(&draw_vertices[0], draw_vertices.size() * sizeof(MD5VertexDrawing));
+        m->arrayBuf.allocate(&draw_vertices[0], draw_vertices.size() * sizeof(MD5VertexTexture));
         m->arrayBuf.release();
 
         QVector<GLuint> draw_indices;
@@ -225,14 +236,14 @@ void MD5Mesh::initDrawing()
     m_arrayLineBuf.create();
     m_indexLineBuf.create();
 
-    QVector<MD5VertexDrawing> points;
-    QVector<MD5VertexDrawing> lines;
+    QVector<MD5VertexColor> points;
+    QVector<MD5VertexColor> lines;
     QVector<GLuint> index_points;
     QVector<GLuint> index_lines;
 
     for (int i = 0; i < m_numJoints; ++i)
     {
-        MD5VertexDrawing v;
+        MD5VertexColor v;
         v.position = (m_joints[i].position);
         v.color = QVector3D(1.0f,0.0f,0.0f);
 
@@ -245,7 +256,7 @@ void MD5Mesh::initDrawing()
     {
         if (m_joints[i].parentIndice != -1)
         {
-            MD5VertexDrawing v1,v2;
+            MD5VertexColor v1,v2;
             v1.position = (m_joints[m_joints[i].parentIndice].position);
             v1.color = QVector3D(0.0f,1.0f,0.0f);
             v2.position = (m_joints[i].position);
@@ -261,10 +272,8 @@ void MD5Mesh::initDrawing()
         }
     }
 
-    qDebug()<<"LineSize : "<<lines.size()<<" ArrayLineSize : "<<index_lines.size();
-
     m_arrayPointBuf.bind();
-    m_arrayPointBuf.allocate(&points[0], points.size() * sizeof(MD5VertexDrawing));
+    m_arrayPointBuf.allocate(&points[0], points.size() * sizeof(MD5VertexColor));
     m_arrayPointBuf.release();
 
     m_indexPointBuf.bind();
@@ -272,7 +281,7 @@ void MD5Mesh::initDrawing()
     m_indexPointBuf.release();
 
     m_arrayLineBuf.bind();
-    m_arrayLineBuf.allocate(&lines[0], lines.size() * sizeof(MD5VertexDrawing));
+    m_arrayLineBuf.allocate(&lines[0], lines.size() * sizeof(MD5VertexColor));
     m_arrayLineBuf.release();
 
     m_indexLineBuf.bind();
@@ -282,6 +291,7 @@ void MD5Mesh::initDrawing()
 
 void MD5Mesh::draw(QOpenGLShaderProgram *program)
 {
+    program->bind();
     for(int mesh_ind=0;mesh_ind<m_numMeshes;++mesh_ind)
     {
         MD5MeshMesh *m = &m_meshes[mesh_ind];
@@ -294,27 +304,30 @@ void MD5Mesh::draw(QOpenGLShaderProgram *program)
         // Tell OpenGL programmable pipeline how to locate vertex position data
         int vertexLocation = program->attributeLocation("position");
         program->enableAttributeArray(vertexLocation);
-        program->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+        program->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexTexture));
 
         // Offset for texture coordinate
         offset += sizeof(QVector3D);
 
         // Tell OpenGL programmable pipeline how to locate vertex texture coordinate data
-        int colorLocation = program->attributeLocation("color");
-        program->enableAttributeArray(colorLocation);
-        program->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+        int textureLocation = program->attributeLocation("vST");
+        program->enableAttributeArray(textureLocation);
+        program->setAttributeBuffer(textureLocation, GL_FLOAT, offset, 2, sizeof(MD5VertexTexture));
 
         // Draw cube geometry using indices from VBO 1
+        m->shader->bind();
         glDrawElements(GL_TRIANGLES, m->numTris*3, GL_UNSIGNED_INT, 0);
 
         m->arrayBuf.release();
         m->indexBuf.release();
     }
+    program->release();
 }
 
-void MD5Mesh::drawSkeleton(QOpenGLShaderProgram *program)
+void MD5Mesh::drawSkeleton(QOpenGLShaderProgram *programLines, QOpenGLShaderProgram *programPoints)
 {
     //Points
+    programPoints->bind();
     m_arrayPointBuf.bind();
     m_indexPointBuf.bind();
 
@@ -322,25 +335,27 @@ void MD5Mesh::drawSkeleton(QOpenGLShaderProgram *program)
     quintptr offset = 0;
 
     // Tell OpenGL programmable pipeline how to locate vertex position data
-    int vertexLocation = program->attributeLocation("position");
-    program->enableAttributeArray(vertexLocation);
-    program->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+    int vertexLocation = programLines->attributeLocation("position");
+    programPoints->enableAttributeArray(vertexLocation);
+    programPoints->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
 
     // Offset for texture coordinate
     offset += sizeof(QVector3D);
 
     // Tell OpenGL programmable pipeline how to locate vertex texture coordinate data
-    int colorLocation = program->attributeLocation("color");
-    program->enableAttributeArray(colorLocation);
-    program->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+    int colorLocation = programLines->attributeLocation("color");
+    programPoints->enableAttributeArray(colorLocation);
+    programPoints->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
 
     // Draw cube geometry using indices from VBO 1
     glDrawElements(GL_POINTS, m_numJoints, GL_UNSIGNED_INT, 0);
 
     m_arrayPointBuf.release();
     m_arrayPointBuf.release();
+    programPoints->release();
 
     //Lines
+    programLines->bind();
     m_arrayLineBuf.bind();
     m_indexLineBuf.bind();
 
@@ -348,23 +363,24 @@ void MD5Mesh::drawSkeleton(QOpenGLShaderProgram *program)
     offset = 0;
 
     // Tell OpenGL programmable pipeline how to locate vertex position data
-    vertexLocation = program->attributeLocation("position");
-    program->enableAttributeArray(vertexLocation);
-    program->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+    vertexLocation = programPoints->attributeLocation("position");
+    programLines->enableAttributeArray(vertexLocation);
+    programLines->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
 
     // Offset for texture coordinate
     offset += sizeof(QVector3D);
 
     // Tell OpenGL programmable pipeline how to locate vertex texture coordinate data
-    colorLocation = program->attributeLocation("color");
-    program->enableAttributeArray(colorLocation);
-    program->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexDrawing));
+    colorLocation = programPoints->attributeLocation("color");
+    programLines->enableAttributeArray(colorLocation);
+    programLines->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
 
     // Draw cube geometry using indices from VBO 1
     glDrawElements(GL_LINES, (m_numJoints-1)*2 , GL_UNSIGNED_INT, 0);
 
     m_arrayLineBuf.release();
     m_indexLineBuf.release();
+    programLines->release();
 }
 
 QString MD5Mesh::toString(bool more)

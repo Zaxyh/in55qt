@@ -91,7 +91,7 @@ protected:
     void updateMovementDir();
 private:
     QBasicTimer timer;
-    QOpenGLShaderProgram program;
+    QOpenGLShaderProgram defaultProgram,md5MeshProgram,pointProgram;
     GeometryEngine *geometries;
 
     QMatrix4x4 projection;
@@ -102,8 +102,8 @@ private:
     QVector3D m_movementDir;
     bool m_q,m_s,m_d,m_z,m_a,m_e;
 
-    MD5Mesh mesh;
-    MD5Anim anim;
+    MD5Mesh *mesh;
+    MD5Anim *anim;
 };
 
 #endif // MAINWIDGET_H

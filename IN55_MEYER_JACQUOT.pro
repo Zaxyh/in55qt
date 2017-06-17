@@ -21,4 +21,4 @@ HEADERS += \
     src/md5anim.h
 
 RESOURCES += \
-    ressources/shaders.qrc \
+    ressources/shaders.qrc

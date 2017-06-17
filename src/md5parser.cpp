@@ -30,20 +30,22 @@ QQuaternion MD5Parser::MakeUnitQuaternion(float x, float y, float z)
     }
     else
     {
-        w = sqrt(w);
+        w = -sqrt(w);
     }
     return (QQuaternion(w,x,y,z));
 }
 
-MD5Mesh MD5Parser::ParseMeshFile(QString path)
+MD5Mesh* MD5Parser::ParseMeshFile(QString path)
 {
-    MD5Mesh mesh;
+    MD5Mesh *mesh = new MD5Mesh();
 
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         return mesh;
     }
+
+    QDir dir = QFileInfo(path).dir();
 
     QTextStream in(&file);
 
@@ -52,7 +54,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
         if (list[0] == "numJoints")
         {
             bool ok;
-            mesh.setNumJoints(list[1].toInt(&ok));
+            mesh->setNumJoints(list[1].toInt(&ok));
             if (!ok)
             {
                 qDebug()<<"Line error";
@@ -61,7 +63,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
         else if (list[0] == "numMeshes")
         {
             bool ok;
-            mesh.setNumMeshes(list[1].toInt(&ok));
+            mesh->setNumMeshes(list[1].toInt(&ok));
             if (!ok)
             {
                 qDebug()<<"Line error";
@@ -92,7 +94,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
                         list[10].toFloat(&ok_qz));
                 if (ok_parent && ok_x && ok_y && ok_z && ok_qx && ok_qy && ok_qz)
                 {
-                    mesh.addJoint(name,parent_indice,position,orientation);
+                    mesh->addJoint(name,parent_indice,position,orientation);
                 }
                 else
                 {
@@ -107,13 +109,28 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
             //Pass current line
             if (!SplitNextLine(in,list)){return mesh;}
 
-            int current_mesh_indice = mesh.addMesh();
+            int current_mesh_indice = mesh->addMesh();
             //Parse every joint
             while (list[0] != "}")
             {
                 if (list[0] == "shader")
                 {
-                    mesh.setShaderInMesh(current_mesh_indice,list[1]);
+                    list[1].remove('"');
+                    QString textPath = dir.filePath(list[1]+".png");
+                    /*
+                    QFile textFile(textPath);
+                    qDebug()<<"Exist \""<<QFileInfo(textFile).absoluteFilePath()<<"\" : "<<textFile.exists();
+                    QImage textImage(QFileInfo(textFile).absoluteFilePath());
+                    qDebug()<< "IsNull : "<<textImage.isNull();
+
+
+                    if (!textFile.open(QFile::ReadOnly)) qDebug()<<"Can't open it";
+                    QByteArray array = textFile.readAll();
+                    QImage textImage(array.data(), 512, 512, QImage::Format_RGB16);
+                    */
+
+                    QOpenGLTexture *texture = new QOpenGLTexture(QImage(textPath));
+                    mesh->setShaderInMesh(current_mesh_indice,texture);
                 }
                 else if (list[0] == "numverts")
                 {
@@ -121,7 +138,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
                     int num_verts = list[1].toInt(&ok_num);
                     if(ok_num)
                     {
-                        mesh.setNumVerticesInMesh(current_mesh_indice,num_verts);
+                        mesh->setNumVerticesInMesh(current_mesh_indice,num_verts);
                     }
                     else
                     {
@@ -137,7 +154,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
 
                     if (ok_stx && ok_sty && ok_start && ok_count)
                     {
-                        mesh.addVertexInMesh(current_mesh_indice,st,start_weight,count_weight);
+                        mesh->addVertexInMesh(current_mesh_indice,st,start_weight,count_weight);
                     }
                     else
                     {
@@ -150,7 +167,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
                     int num_tris = list[1].toInt(&ok_num);
                     if(ok_num)
                     {
-                        mesh.setNumTrianglesInMesh(current_mesh_indice,num_tris);
+                        mesh->setNumTrianglesInMesh(current_mesh_indice,num_tris);
                     }
                     else
                     {
@@ -166,7 +183,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
 
                     if (ok_vert0 && ok_vert1 && ok_vert2)
                     {
-                        mesh.addTriangleInMesh(current_mesh_indice,vert0,vert1,vert2);
+                        mesh->addTriangleInMesh(current_mesh_indice,vert0,vert1,vert2);
                     }
                     else
                     {
@@ -179,7 +196,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
                     int num_weights = list[1].toInt(&ok_num);
                     if(ok_num)
                     {
-                        mesh.setNumWeightsInMesh(current_mesh_indice,num_weights);
+                        mesh->setNumWeightsInMesh(current_mesh_indice,num_weights);
                     }
                     else
                     {
@@ -197,7 +214,7 @@ MD5Mesh MD5Parser::ParseMeshFile(QString path)
 
                     if (ok_ind_joint && ok_bias && ok_pos_x && ok_pos_y && ok_pos_z)
                     {
-                        mesh.addWeightInMesh(current_mesh_indice,ind_joint,bias,position);
+                        mesh->addWeightInMesh(current_mesh_indice,ind_joint,bias,position);
                     }
                     else
                     {

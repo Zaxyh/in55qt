@@ -71,6 +71,7 @@ MainWidget::~MainWidget()
     // and the buffers.
     makeCurrent();
     delete geometries;
+    delete mesh;
     doneCurrent();
 }
 
@@ -217,6 +218,8 @@ void MainWidget::initializeGL()
 //! [2]
     // Enable depth buffer
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_POINT_SPRITE);
 
     // Enable back face culling
     //glEnable(GL_CULL_FACE);
@@ -230,8 +233,8 @@ void MainWidget::initializeGL()
     QTextStream out(stdout);
 
     mesh = MD5Parser::ParseMeshFile("Animation/bob_lamp_update.md5mesh");
-    mesh.initDrawing();
-    out << mesh.toString() << "\n";
+    mesh->initDrawing();
+    out << mesh->toString() << "\n";
     out <<"Inited for drawing !\n";
 }
 
@@ -239,20 +242,47 @@ void MainWidget::initializeGL()
 void MainWidget::initShaders()
 {
     // Compile vertex shader
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/vshader.glsl"))
+    if (!defaultProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/vshader.glsl"))
         close();
 
     // Compile fragment shader
-    if (!program.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/fshader.glsl"))
+    if (!defaultProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/fshader.glsl"))
         close();
 
     // Link shader pipeline
-    if (!program.link())
+    if (!defaultProgram.link())
         close();
 
-    // Bind shader pipeline for use
-    if (!program.bind())
+    // Compile vertex shader
+    if (!pointProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/pointvshader.glsl"))
         close();
+
+    // Compile fragment shader
+    if (!pointProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/fshader.glsl"))
+        close();
+
+    // Link pointProgram pipeline
+    if (!pointProgram.link())
+        close();
+
+    pointProgram.bind();
+    pointProgram.setUniformValue("point_size",5.0f);
+    pointProgram.release();
+
+    // Compile vertex shader
+    if (!md5MeshProgram.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/meshvshader.glsl"))
+        close();
+
+    // Compile fragment shader
+    if (!md5MeshProgram.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/meshfshader.glsl"))
+        close();
+
+    // Link shader pipeline
+    if (!md5MeshProgram.link())
+        close();
+
+    md5MeshProgram.bind();
+    md5MeshProgram.setUniformValue("texture",0);
 }
 //! [3]
 
@@ -263,8 +293,8 @@ void MainWidget::resizeGL(int w, int h)
     // Calculate aspect ratio
     qreal aspect = qreal(w) / qreal(h ? h : 1);
 
-    // Set near plane to 1.0, far plane to 1000.0, field of view 60 degrees
-    const qreal zNear = 1.0, zFar = 1000.0, fov = 60.0;
+    // Set near plane to 0.1, far plane to 1000.0, field of view 60 degrees
+    const qreal zNear = 0.1, zFar = 1000.0, fov = 60.0;
 
     // Reset projection
     projection.setToIdentity();
@@ -279,7 +309,6 @@ void MainWidget::paintGL()
     // Clear color and depth buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//! [6]
     // Calculate view transformation
     m_camera.update(m_movementDir);
     QMatrix4x4 view = m_camera.getView();
@@ -289,15 +318,30 @@ void MainWidget::paintGL()
     m_model.translate(0.0, 0.0, -5.0);
 
     // Set modelview-projection matrix
-    program.setUniformValue("mvp", projection * view * m_model);
-//! [6]
+    defaultProgram.bind();
+    defaultProgram.setUniformValue("mvp", projection * view * m_model);
+    defaultProgram.release();
 
     // Draw cube geometry
-    geometries->drawGeometry(&program);
+    geometries->drawGeometry(&defaultProgram);
 
     m_model.rotate(-90.0f,QVector3D(1.0f,0.0f,0.0f));
     m_model.scale(0.3f);
-    program.setUniformValue("mvp", projection * view * m_model);
-    mesh.draw(&program);
-    //mesh.drawSkeleton(&program);
+
+    /*
+    defaultProgram.bind();
+    defaultProgram.setUniformValue("mvp", projection * view * m_model);
+    defaultProgram.release();
+    pointProgram.bind();
+    pointProgram.setUniformValue("mvp", projection * view * m_model);
+    pointProgram.release();
+    mesh->drawSkeleton(&defaultProgram, &pointProgram);
+    */
+
+
+    md5MeshProgram.bind();
+    md5MeshProgram.setUniformValue("mvp", projection * view * m_model);
+    md5MeshProgram.release();
+    mesh->draw(&md5MeshProgram);
+
 }

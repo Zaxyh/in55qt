@@ -4,6 +4,7 @@
 #include "md5anim.h"
 #include "md5mesh.h"
 
+#include "QDir"
 #include "QFile"
 #include "QQuaternion"
 #include "QString"
@@ -11,7 +12,7 @@
 class MD5Parser
 {
 public:
-    static MD5Mesh ParseMeshFile(QString path);
+    static MD5Mesh* ParseMeshFile(QString path);
 private:
     MD5Parser();
     static bool SplitNextLine(QTextStream& in, QStringList& list);
