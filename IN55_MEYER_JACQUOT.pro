@@ -10,7 +10,8 @@ SOURCES += \
     src/camera.cpp \
     src/md5parser.cpp \
     src/md5mesh.cpp \
-    src/md5anim.cpp
+    src/md5anim.cpp \
+    src/md5skeleton.cpp
 
 HEADERS += \
     src/mainwidget.h \
@@ -18,7 +19,9 @@ HEADERS += \
     src/camera.h \
     src/md5parser.h \
     src/md5mesh.h \
-    src/md5anim.h
+    src/md5anim.h \
+    src/md5skeleton.h
 
 RESOURCES += \
-    ressources/shaders.qrc \
+    ressources/shaders/shaders.qrc \
+    ressources/images/images.qrc

@@ -1,14 +1,18 @@
 #ifndef MD5MESH_H
 #define MD5MESH_H
 
-#include "QQuaternion"
+#include "md5anim.h"
+#include "md5skeleton.h"
+
+#include <QQuaternion>
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
-#include "QString"
-#include "QVector"
-#include "QVector2D"
-#include "QVector3D"
+#include <QOpenGLTexture>
+#include <QString>
+#include <QVector>
+#include <QVector2D>
+#include <QVector3D>
 
 class MD5Mesh : protected QOpenGLFunctions
 {
@@ -18,8 +22,6 @@ public:
         QVector2D st;
         int startWeight;
         int countWeight;
-
-        QVector3D computedPosition;
     };
 
     struct MD5MeshTriangle
@@ -37,14 +39,14 @@ public:
     struct MD5MeshJoint
     {
         QString name;
-        int parentIndice;
+        int parentIndex;
         QQuaternion orientation;
         QVector3D position;
     };
 
     struct MD5MeshMesh
     {
-        QString shader;
+        QOpenGLTexture *shader = NULL;
 
         int numVerts;
         QVector<MD5MeshVertex> vertices;
@@ -55,7 +57,6 @@ public:
         int numWeights;
         QVector<MD5MeshWeight> weights;
 
-        bool vbosInited = false;
         QOpenGLBuffer arrayBuf;
         QOpenGLBuffer indexBuf;
     };
@@ -63,7 +64,7 @@ public:
     MD5Mesh();
     ~MD5Mesh();
 
-    void addJoint(QString name, int parentIndice, QVector3D position, QQuaternion orientation);
+    void addJoint(QString name, int parentIndex, QVector3D position, QQuaternion orientation);
     int addMesh();
 
     void addVertexInMesh(int mesh_indice, QVector2D st, int startWeight, int countWeight);
@@ -82,32 +83,29 @@ public:
     void setNumWeightsInMesh(int mesh_indice, int n);
     int getNumWeightsInMesh();
 
-    void setShaderInMesh(int mesh_indice, QString name);
+    void setShaderInMesh(int mesh_indice, QOpenGLTexture *texture);
     QString getShaderInMesh();
 
     bool isCorrupted();
+    bool checkAnimation(MD5Anim *anim);
 
-    void initDrawing();
+    void prepareDrawing();
+
+    void setDefaultSkeleton();
+    void setSkeleton(MD5Skeleton *skeleton);
+
     void draw(QOpenGLShaderProgram *program);
-    void drawSkeleton(QOpenGLShaderProgram *program);
+    void drawSkeleton(QOpenGLShaderProgram *programLines, QOpenGLShaderProgram *programPoints);
 
     QString toString(bool more = false);
 private:
     int m_numJoints;
     int m_numMeshes;
 
-    bool m_computed = false;
-
     QVector<MD5MeshMesh> m_meshes;
     QVector<MD5MeshJoint> m_joints;
 
-    QOpenGLBuffer m_arrayPointBuf;
-    QOpenGLBuffer m_indexPointBuf;
-
-    QOpenGLBuffer m_arrayLineBuf;
-    QOpenGLBuffer m_indexLineBuf;
-
-    void computeVerticesPositions();
+    MD5Skeleton *m_skeleton;
 };
 
 #endif // MD5MESH_H

@@ -55,6 +55,8 @@
 #include "geometryengine.h"
 #include "md5parser.h"
 
+#include <QCheckBox>
+#include <QComboBox>
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QMatrix4x4>
@@ -63,6 +65,9 @@
 #include <QBasicTimer>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLTexture>
+#include <QPushButton>
+#include <QFileDialog>
+#include <QDateTime>
 
 class GeometryEngine;
 
@@ -79,7 +84,6 @@ protected:
     void mouseReleaseEvent(QMouseEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
     void keyReleaseEvent(QKeyEvent *e) override;
-    void timerEvent(QTimerEvent *e) override;
 
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -89,9 +93,15 @@ protected:
     void initTextures();
 
     void updateMovementDir();
+
+    void disableMesh();
+    void enableMesh();
+    void disableAnim();
+    void enableAnim();
+    void playAnim();
+    void pauseAnim();
 private:
-    QBasicTimer timer;
-    QOpenGLShaderProgram program;
+    QOpenGLShaderProgram defaultProgram,md5MeshProgram,pointProgram;
     GeometryEngine *geometries;
 
     QMatrix4x4 projection;
@@ -102,8 +112,35 @@ private:
     QVector3D m_movementDir;
     bool m_q,m_s,m_d,m_z,m_a,m_e;
 
-    MD5Mesh mesh;
-    MD5Anim anim;
+    bool m_meshLoaded, m_animLoaded;
+    MD5Mesh *mesh;
+    MD5Anim *anim;
+
+    //UI
+    bool m_showSkeleton;
+    QCheckBox *m_checkSkeleton;
+    QPushButton *m_loadMesh;
+    QPushButton *m_loadAnim;
+    bool m_isPlayingAnim;
+    QPushButton *m_playAnim;
+    QPushButton *m_pauseAnim;
+    bool m_loopAnim;
+    QCheckBox *m_checkLoopAnim;
+    QFileDialog *m_fileDialog;
+
+    double m_duration;
+    qint64 m_lastTime;
+
+    bool m_boolFaceCulling;
+    QCheckBox *m_checkFaceCulling;
+    QComboBox *m_comboFaceCulling;
+private slots:
+    void loadMesh(bool checked);
+    void loadAnim(bool checked);
+    void showSkeletonModfied(int state);
+    void playAnim(bool checked);
+    void pauseAnim(bool checked);
+    void loopAnim(int state);
 };
 
 #endif // MAINWIDGET_H

@@ -118,6 +118,7 @@ void GeometryEngine::initGeometry()
 void GeometryEngine::drawGeometry(QOpenGLShaderProgram *program)
 {
     // Tell OpenGL which VBOs to use
+    program->bind();
     arrayBuf.bind();
     indexBuf.bind();
 
@@ -140,5 +141,9 @@ void GeometryEngine::drawGeometry(QOpenGLShaderProgram *program)
 
     // Draw cube geometry using indices from VBO 1
     glDrawElements(GL_LINES, 6, GL_UNSIGNED_SHORT, 0);
+
+    arrayBuf.release();
+    indexBuf.release();
+    program->release();
 }
 //! [2]
