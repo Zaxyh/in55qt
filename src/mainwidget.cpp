@@ -58,16 +58,19 @@
 MainWidget::MainWidget(QWidget *parent) :
     QOpenGLWidget(parent),
     geometries(0),
-    //angularSpeed(0),
+    lightIndicator(0),
     m_camera(),
     m_model(),
     m_meshLoaded(false),
     m_animLoaded(false),
+    m_showNormal(false),
     m_showSkeleton(false),
     m_isPlayingAnim(false),
     m_loopAnim(false),
     m_duration(0.0f),
-    m_boolFaceCulling(false)
+    m_lastTime(QDateTime::currentMSecsSinceEpoch()),
+    m_boolFaceCulling(false),
+    m_angleLight(0.0f)
 {
     m_z=m_s=m_q=m_d=m_a=m_e=false;
 
@@ -78,24 +81,33 @@ MainWidget::MainWidget(QWidget *parent) :
     m_loadMesh->setGeometry(10,10,200,20);
     connect(m_loadMesh, SIGNAL(clicked(bool)),this, SLOT(loadMesh(bool)));
 
+    //Normal Check Box
+    m_checkNormal = new QCheckBox("Afficher les normals",this);
+    m_checkNormal->setStyleSheet("QCheckBox { color: white }"
+                                   "QCheckBox:disabled { color: black }");
+    m_checkNormal->setGeometry(10,40,200,20);
+    m_checkNormal->setEnabled(false);
+    m_checkNormal->setCheckState(m_showNormal?Qt::CheckState::Checked:Qt::CheckState::Unchecked);
+    connect(m_checkNormal, SIGNAL (stateChanged(int)),this, SLOT (showNormalModified(int)));
+
     //Skeleton Check Box
     m_checkSkeleton = new QCheckBox("Afficher le squelette",this);
     m_checkSkeleton->setStyleSheet("QCheckBox { color: white }"
                                    "QCheckBox:disabled { color: black }");
-    m_checkSkeleton->setGeometry(10,40,200,20);
+    m_checkSkeleton->setGeometry(10,70,200,20);
     m_checkSkeleton->setEnabled(false);
     m_checkSkeleton->setCheckState(m_showSkeleton?Qt::CheckState::Checked:Qt::CheckState::Unchecked);
     connect(m_checkSkeleton, SIGNAL (stateChanged(int)),this, SLOT (showSkeletonModfied(int)));
 
     //Anim loader
     m_loadAnim = new QPushButton("Charger une animation MD5",this);
-    m_loadAnim->setGeometry(10,70,200,20);
+    m_loadAnim->setGeometry(10,100,200,20);
     m_loadAnim->setEnabled(false);
     connect(m_loadAnim, SIGNAL(clicked(bool)),this, SLOT(loadAnim(bool)));
 
     //Play button
     m_playAnim = new QPushButton(this);
-    m_playAnim->setGeometry(10,100,48,48);
+    m_playAnim->setGeometry(10,130,48,48);
     QIcon ico_play;
     ico_play.addPixmap(QPixmap(":/play_button.png"),QIcon::Normal);
     ico_play.addPixmap(QPixmap(":/play_button_off.png"),QIcon::Disabled);
@@ -107,7 +119,7 @@ MainWidget::MainWidget(QWidget *parent) :
 
     //Pause button
     m_pauseAnim = new QPushButton(this);
-    m_pauseAnim->setGeometry(68,100,48,48);
+    m_pauseAnim->setGeometry(68,130,48,48);
     QIcon ico_pause;
     ico_pause.addPixmap(QPixmap(":/pause_button.png"),QIcon::Normal);
     ico_pause.addPixmap(QPixmap(":/pause_button_off.png"),QIcon::Disabled);
@@ -121,7 +133,7 @@ MainWidget::MainWidget(QWidget *parent) :
     m_checkLoopAnim = new QCheckBox("Loop animation",this);
     m_checkLoopAnim->setStyleSheet("QCheckBox { color: white }"
                                    "QCheckBox:disabled { color: black }");
-    m_checkLoopAnim->setGeometry(10,158,200,20);
+    m_checkLoopAnim->setGeometry(10,188,200,20);
     m_checkLoopAnim->setEnabled(false);
     m_checkLoopAnim->setCheckState(m_loopAnim?Qt::CheckState::Checked:Qt::CheckState::Unchecked);
     connect(m_checkLoopAnim, SIGNAL (stateChanged(int)),this, SLOT (loopAnim(int)));
@@ -145,6 +157,7 @@ MainWidget::~MainWidget()
     doneCurrent();
 
     delete m_loadMesh;
+    delete m_checkNormal;
     delete m_checkSkeleton;
     delete m_loadAnim;
 
@@ -278,9 +291,22 @@ void MainWidget::initializeGL()
     glEnable(GL_PROGRAM_POINT_SIZE);
     glEnable(GL_POINT_SPRITE);
 
-    geometries = new GeometryEngine;
+    initLights();
 
-    QTextStream out(stdout);
+    geometries = new GeometryEngine;
+    lightIndicator = new LightIndicator;
+}
+
+void MainWidget::initLights()
+{
+    md5MeshProgram.bind();
+    md5MeshProgram.setUniformValue("lightColor",QVector4D(1.0,1.0,1.0,1.0));
+    md5MeshProgram.setUniformValue("materialDiffuse",QVector4D(0.55,0.55,0.55,1.0));
+    md5MeshProgram.setUniformValue("materialSpecular",QVector4D(0.2,0.2,0.2,1.0));
+    md5MeshProgram.setUniformValue("materialShininess",5.0f);
+
+    md5MeshProgram.setUniformValue("ambient",QVector4D(0.3,0.3,0.3,1.0));
+    md5MeshProgram.release();
 }
 
 //! [3]
@@ -346,11 +372,27 @@ void MainWidget::resizeGL(int w, int h)
 
     // Set perspective projection
     projection.perspective(fov, aspect, zNear, zFar);
+
+    defaultProgram.bind();
+    defaultProgram.setUniformValue("p",projection);
+    defaultProgram.release();
+
+    pointProgram.bind();
+    pointProgram.setUniformValue("p",projection);
+    pointProgram.release();
+
+    md5MeshProgram.bind();
+    md5MeshProgram.setUniformValue("p",projection);
+    md5MeshProgram.release();
 }
 //! [5]
 
 void MainWidget::paintGL()
 {
+    qint64 current_time = QDateTime::currentMSecsSinceEpoch();
+    double delta_time = ((double)(current_time-m_lastTime)) / 1000.0;
+    m_lastTime = current_time;
+
     // Clear color and depth buffer
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -358,17 +400,34 @@ void MainWidget::paintGL()
     m_camera.update(m_movementDir);
     QMatrix4x4 view = m_camera.getView();
 
+    defaultProgram.bind();
+    defaultProgram.setUniformValue("v",view);
+    defaultProgram.release();
+
+    pointProgram.bind();
+    pointProgram.setUniformValue("v",view);
+    pointProgram.release();
+
+    md5MeshProgram.bind();
+    md5MeshProgram.setUniformValue("v",view);
+    md5MeshProgram.setUniformValue("eyePosWorld",QVector4D(m_camera.getPosition(),1.0));
+    md5MeshProgram.release();
+
     //Calculate model transformation
     m_model.setToIdentity();
     m_model.translate(0.0, 0.0, -5.0);
 
     // Set modelview-projection matrix
     defaultProgram.bind();
-    defaultProgram.setUniformValue("mvp", projection * view * m_model);
+    defaultProgram.setUniformValue("m", m_model);
     defaultProgram.release();
 
     // Draw cube geometry
     geometries->drawGeometry(&defaultProgram);
+
+    m_angleLight += 30 * delta_time;
+    m_angleLight = fmod(m_angleLight,360.0f);
+    QMatrix4x4 light_model = m_model;
 
     if(m_meshLoaded)
     {
@@ -377,10 +436,9 @@ void MainWidget::paintGL()
 
         if(m_animLoaded)
         {
-            qint64 current_time = QDateTime::currentMSecsSinceEpoch();
             if(m_isPlayingAnim)
             {
-                m_duration += ((double)(current_time-m_lastTime)) / 1000.0;
+                m_duration += delta_time;
 
                 MD5Skeleton *current_skeleton = new MD5Skeleton();
                 if (anim->getSkeletonFromDuration(current_skeleton,m_duration,m_loopAnim))
@@ -392,22 +450,46 @@ void MainWidget::paintGL()
                 mesh->setSkeleton(current_skeleton);
                 mesh->prepareDrawing();
             }
-            m_lastTime = current_time;
         }
 
+
+        //Compute Light position
+        QVector4D light_pos(cos(qDegreesToRadians(m_angleLight))*2.0f,1.0,sin(qDegreesToRadians(m_angleLight))*2.0f,1.0);
+
+        light_model.translate(light_pos.toVector3D());
         md5MeshProgram.bind();
-        md5MeshProgram.setUniformValue("mvp", projection * view * m_model);
+        md5MeshProgram.setUniformValue("lightPosWorld", light_model * light_pos );
+        md5MeshProgram.release();
+        light_model.scale(0.1,0.1,0.1);
+
+        //Draw Light
+        defaultProgram.bind();
+        defaultProgram.setUniformValue("m", light_model);
+        defaultProgram.release();
+        lightIndicator->draw(&defaultProgram);
+
+        //Draw Mesh
+        md5MeshProgram.bind();
+        md5MeshProgram.setUniformValue("m", m_model);
         md5MeshProgram.release();
         mesh->draw(&md5MeshProgram);
+
+        if(m_showNormal)
+        {
+            defaultProgram.bind();
+            defaultProgram.setUniformValue("m", m_model);
+            defaultProgram.release();
+            mesh->drawNormal(&defaultProgram);
+        }
 
         if(m_showSkeleton)
         {
             glDisable(GL_DEPTH_TEST);
             defaultProgram.bind();
-            defaultProgram.setUniformValue("mvp", projection * view * m_model);
+            defaultProgram.setUniformValue("m", m_model);
             defaultProgram.release();
             pointProgram.bind();
-            pointProgram.setUniformValue("mvp", projection * view * m_model);
+            pointProgram.setUniformValue("m", m_model);
             pointProgram.release();
             mesh->drawSkeleton(&defaultProgram, &pointProgram);
             glEnable(GL_DEPTH_TEST);
@@ -424,6 +506,7 @@ void MainWidget::disableMesh()
 
     m_meshLoaded = false;
     m_loadAnim->setEnabled(false);
+    m_checkNormal->setEnabled(false);
     m_checkSkeleton->setEnabled(false);
 
     disableAnim();
@@ -432,6 +515,7 @@ void MainWidget::disableMesh()
 void MainWidget::enableMesh()
 {
     m_meshLoaded = true;
+    m_checkNormal->setEnabled(true);
     m_checkSkeleton->setEnabled(true);
     m_loadAnim->setEnabled(true);
 }
@@ -456,7 +540,6 @@ void MainWidget::enableAnim()
 {
     m_animLoaded = true;
 
-    m_lastTime = QDateTime::currentMSecsSinceEpoch();
     m_checkLoopAnim->setEnabled(true);
     playAnim();
 }
@@ -494,6 +577,8 @@ void MainWidget::loadMesh(bool)
 void MainWidget::loadAnim(bool)
 {
     disableAnim();
+    mesh->setDefaultSkeleton();
+    mesh->prepareDrawing();
 
     QString animPath = QFileDialog::getOpenFileName(this,"Charger une animation MD5", QDir::currentPath(), "MD5 anim (*.md5anim)");
 
@@ -503,6 +588,11 @@ void MainWidget::loadAnim(bool)
 
         enableAnim();
     }
+}
+
+void MainWidget::showNormalModified(int state)
+{
+    m_showNormal = (Qt::CheckState::Checked==state)?true:false;
 }
 
 void MainWidget::showSkeletonModfied(int state)

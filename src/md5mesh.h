@@ -22,6 +22,8 @@ public:
         QVector2D st;
         int startWeight;
         int countWeight;
+
+        QVector3D normal;
     };
 
     struct MD5MeshTriangle
@@ -59,6 +61,9 @@ public:
 
         QOpenGLBuffer arrayBuf;
         QOpenGLBuffer indexBuf;
+
+        QOpenGLBuffer arrayNormalBuf;
+        QOpenGLBuffer indexNormalBuf;
     };
 
     MD5Mesh();
@@ -90,12 +95,14 @@ public:
     bool checkAnimation(MD5Anim *anim);
 
     void prepareDrawing();
+    void prepareNormals();
 
     void setDefaultSkeleton();
     void setSkeleton(MD5Skeleton *skeleton);
 
     void draw(QOpenGLShaderProgram *program);
     void drawSkeleton(QOpenGLShaderProgram *programLines, QOpenGLShaderProgram *programPoints);
+    void drawNormal(QOpenGLShaderProgram *programLines);
 
     QString toString(bool more = false);
 private:

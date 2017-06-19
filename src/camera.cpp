@@ -42,6 +42,11 @@ void Camera::update(QVector3D dir)
     updateMovement(dir);
 }
 
+QVector3D Camera::getPosition()
+{
+    return m_position;
+}
+
 QMatrix4x4 Camera::getView()
 {
     QMatrix4x4 returned;

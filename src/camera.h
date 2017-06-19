@@ -17,6 +17,8 @@ public:
     void endMouseRotation();
 
     void update(QVector3D dir);
+    QVector3D getPosition();
+
     QMatrix4x4 getView();
     QVector3D front();
     QVector3D right();

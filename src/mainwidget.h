@@ -53,6 +53,7 @@
 
 #include "camera.h"
 #include "geometryengine.h"
+#include "lightindicator.h"
 #include "md5parser.h"
 
 #include <QCheckBox>
@@ -90,7 +91,7 @@ protected:
     void paintGL() override;
 
     void initShaders();
-    void initTextures();
+    void initLights();
 
     void updateMovementDir();
 
@@ -103,6 +104,7 @@ protected:
 private:
     QOpenGLShaderProgram defaultProgram,md5MeshProgram,pointProgram;
     GeometryEngine *geometries;
+    LightIndicator *lightIndicator;
 
     QMatrix4x4 projection;
     Camera m_camera;
@@ -117,6 +119,8 @@ private:
     MD5Anim *anim;
 
     //UI
+    bool m_showNormal;
+    QCheckBox *m_checkNormal;
     bool m_showSkeleton;
     QCheckBox *m_checkSkeleton;
     QPushButton *m_loadMesh;
@@ -134,9 +138,12 @@ private:
     bool m_boolFaceCulling;
     QCheckBox *m_checkFaceCulling;
     QComboBox *m_comboFaceCulling;
+
+    float m_angleLight;
 private slots:
     void loadMesh(bool checked);
     void loadAnim(bool checked);
+    void showNormalModified(int state);
     void showSkeletonModfied(int state);
     void playAnim(bool checked);
     void pauseAnim(bool checked);

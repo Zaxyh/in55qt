@@ -221,6 +221,7 @@ MD5Mesh* MD5Parser::ParseMeshFile(QString path)
     if(!mesh->isCorrupted())
     {
         mesh->setDefaultSkeleton();
+        mesh->prepareNormals();
     }
 
     return mesh;

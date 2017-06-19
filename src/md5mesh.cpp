@@ -4,6 +4,13 @@ struct MD5VertexTexture
 {
     QVector3D position;
     QVector2D st;
+    QVector3D normal;
+};
+
+struct MD5VertexColor
+{
+    QVector3D position;
+    QVector3D color;
 };
 
 MD5Mesh::MD5Mesh():
@@ -21,6 +28,12 @@ MD5Mesh::~MD5Mesh()
 
         if(m.indexBuf.isCreated())
             m.indexBuf.destroy();
+
+        if(m.arrayNormalBuf.isCreated())
+            m.arrayNormalBuf.destroy();
+
+        if(m.indexNormalBuf.isCreated())
+            m.indexNormalBuf.destroy();
 
         if(m.shader!=NULL)
             m.shader->destroy();
@@ -167,13 +180,15 @@ void MD5Mesh::prepareDrawing()
         //Compute mesh vertices
         QVector<MD5VertexTexture> computed_vertices;
 
+        QVector<MD5VertexColor> normal_vertice;
+        QVector<GLuint> normal_index;
+
         for(int vert_ind=0;vert_ind<m->numVerts;++vert_ind)
         {
             MD5MeshVertex *v = &m->vertices[vert_ind];
             MD5VertexTexture computed_vertex;
             computed_vertex.position = QVector3D(0.0f, 0.0f, 0.0f);
 
-            float total_bias = 0.0f;
             for(int wei_ind=0;wei_ind<v->countWeight;++wei_ind)
             {
                 MD5MeshWeight *w = &m->weights[v->startWeight+wei_ind];
@@ -181,14 +196,26 @@ void MD5Mesh::prepareDrawing()
                 QVector3D weight_rotated_position = m_skeleton->getJointOrientation(w->jointIndice).rotatedVector(w->position);
 
                 computed_vertex.position += (m_skeleton->getJointPosition(w->jointIndice) + weight_rotated_position) * w->bias;
-                total_bias+=w->bias;
+
+                computed_vertex.normal += (m_skeleton->getJointOrientation(w->jointIndice).rotatedVector(v->normal)) * w->bias;
             }
 
             computed_vertex.st = v->st;
             computed_vertices.append(computed_vertex);
+
+            MD5VertexColor normal_vertex0,normal_vertex1;
+            normal_vertex0.position = computed_vertex.position;
+            normal_vertex0.color = QVector3D(1.0,1.0,0.0);
+            normal_vertex1.position = normal_vertex0.position + computed_vertex.normal.normalized() * 0.1f;
+            normal_vertex1.color = QVector3D(1.0,1.0,0.0);
+
+            normal_vertice.append(normal_vertex0);
+            normal_index.append(((GLuint) vert_ind*2));
+            normal_vertice.append(normal_vertex1);
+            normal_index.append(((GLuint) vert_ind*2+1));
         }
 
-        //Init VBOs
+        //Init VBOs mesh
         m->arrayBuf = QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
         m->arrayBuf.create();
         m->indexBuf = QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
@@ -209,9 +236,80 @@ void MD5Mesh::prepareDrawing()
         m->indexBuf.bind();
         m->indexBuf.allocate(&draw_indices[0], draw_indices.size() * sizeof(GLuint));
         m->indexBuf.release();
+
+        //Init VBOs normal
+        m->arrayNormalBuf = QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m->arrayNormalBuf.create();
+        m->indexNormalBuf = QOpenGLBuffer(QOpenGLBuffer::IndexBuffer);
+        m->indexNormalBuf.create();
+
+        m->arrayNormalBuf.bind();
+        m->arrayNormalBuf.allocate(&normal_vertice[0], normal_vertice.size() * sizeof(MD5VertexColor));
+        m->arrayNormalBuf.release();
+
+        m->indexNormalBuf.bind();
+        m->indexNormalBuf.allocate(&normal_index[0], normal_index.size() * sizeof(GLuint));
+        m->indexNormalBuf.release();
     }
 
     m_skeleton->prepareDrawing();
+}
+
+void MD5Mesh::prepareNormals()
+{
+    for (int mesh_ind=0;mesh_ind<m_numMeshes;++mesh_ind)
+    {
+        MD5MeshMesh *m = &m_meshes[mesh_ind];
+
+        QVector<QVector3D> position_vertices;
+
+        for(int vert_ind=0;vert_ind<m->numVerts;++vert_ind)
+        {
+            MD5MeshVertex *v = &m->vertices[vert_ind];
+            QVector3D position_vertice = QVector3D(0.0f, 0.0f, 0.0f);
+
+            for(int wei_ind=0;wei_ind<v->countWeight;++wei_ind)
+            {
+                MD5MeshWeight *w = &m->weights[v->startWeight+wei_ind];
+
+                QVector3D weight_rotated_position = m_skeleton->getJointOrientation(w->jointIndice).rotatedVector(w->position);
+
+                position_vertice += (m_skeleton->getJointPosition(w->jointIndice) + weight_rotated_position) * w->bias;
+            }
+
+            position_vertices.append(position_vertice);
+        }
+
+        for ( int i = 0; i < m->triangles.size(); ++i )
+        {
+            QVector3D v0 = position_vertices[ m->triangles[i].vertex0 ];
+            QVector3D v1 = position_vertices[ m->triangles[i].vertex1 ];
+            QVector3D v2 = position_vertices[ m->triangles[i].vertex2 ];
+
+            QVector3D normal = QVector3D::crossProduct( v2 - v0, v1 - v0);
+
+            m->vertices[ m->triangles[i].vertex0 ].normal += normal;
+            m->vertices[ m->triangles[i].vertex1 ].normal += normal;
+            m->vertices[ m->triangles[i].vertex2 ].normal += normal;
+        }
+
+        for ( int i = 0; i < m->vertices.size(); ++i )
+        {
+            MD5MeshVertex *v = &m->vertices[i];
+            QVector3D normal = v->normal.normalized();
+
+            v->normal = QVector3D(0.0f, 0.0f, 0.0f);
+
+            //Pré calcule dans l'espace joint local
+            for ( int j = 0; j < m->vertices[i].countWeight; ++j )
+            {
+                MD5MeshWeight *weight = &m->weights[v->startWeight+j];
+                MD5MeshJoint *joint = &m_joints[weight->jointIndice];
+
+                v->normal += ( joint->orientation.inverted().rotatedVector(normal) ) * weight->bias;
+            }
+        }
+    }
 }
 
 void MD5Mesh::setDefaultSkeleton()
@@ -264,6 +362,12 @@ void MD5Mesh::draw(QOpenGLShaderProgram *program)
         program->enableAttributeArray(textureLocation);
         program->setAttributeBuffer(textureLocation, GL_FLOAT, offset, 2, sizeof(MD5VertexTexture));
 
+        offset += sizeof(QVector2D);
+
+        int normalLocation = program->attributeLocation("normal");
+        program->enableAttributeArray(normalLocation);
+        program->setAttributeBuffer(normalLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexTexture));
+
         // Draw cube geometry using indices from VBO 1
         m->shader->bind();
         glDrawElements(GL_TRIANGLES, m->numTris*3, GL_UNSIGNED_INT, 0);
@@ -272,6 +376,39 @@ void MD5Mesh::draw(QOpenGLShaderProgram *program)
         m->indexBuf.release();
     }
     program->release();
+}
+
+void MD5Mesh::drawNormal(QOpenGLShaderProgram *programLines)
+{
+    programLines->bind();
+    for(int mesh_ind=0;mesh_ind<m_numMeshes;++mesh_ind)
+    {
+        MD5MeshMesh *m = &m_meshes[mesh_ind];
+        m->arrayNormalBuf.bind();
+        m->indexNormalBuf.bind();
+
+        // Offset for position
+        quintptr offset = 0;
+
+        // Tell OpenGL programmable pipeline how to locate vertex position data
+        int vertexLocation = programLines->attributeLocation("position");
+        programLines->enableAttributeArray(vertexLocation);
+        programLines->setAttributeBuffer(vertexLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
+
+        // Offset for texture coordinate
+        offset += sizeof(QVector3D);
+
+        // Tell OpenGL programmable pipeline how to locate vertex texture coordinate data
+        int colorLocation = programLines->attributeLocation("color");
+        programLines->enableAttributeArray(colorLocation);
+        programLines->setAttributeBuffer(colorLocation, GL_FLOAT, offset, 3, sizeof(MD5VertexColor));
+
+        glDrawElements(GL_LINES, m->numVerts*2, GL_UNSIGNED_INT, 0);
+
+        m->arrayBuf.release();
+        m->indexBuf.release();
+    }
+    programLines->release();
 }
 
 void MD5Mesh::drawSkeleton(QOpenGLShaderProgram *programLines, QOpenGLShaderProgram *programPoints)

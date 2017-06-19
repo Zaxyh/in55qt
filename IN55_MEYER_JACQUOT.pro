@@ -11,7 +11,8 @@ SOURCES += \
     src/md5parser.cpp \
     src/md5mesh.cpp \
     src/md5anim.cpp \
-    src/md5skeleton.cpp
+    src/md5skeleton.cpp \
+    src/lightindicator.cpp
 
 HEADERS += \
     src/mainwidget.h \
@@ -20,7 +21,8 @@ HEADERS += \
     src/md5parser.h \
     src/md5mesh.h \
     src/md5anim.h \
-    src/md5skeleton.h
+    src/md5skeleton.h \
+    src/lightindicator.h
 
 RESOURCES += \
     ressources/shaders/shaders.qrc \
